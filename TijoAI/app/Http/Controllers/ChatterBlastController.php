@@ -10,15 +10,21 @@ use Illuminate\View\View;
 
 class ChatterBlastController extends Controller
 {
-    public function startConversation(): JsonResponse
+    public function index() {
+        return 'oi';
+    }
+
+    public function startConversation()
     {
-        $conversation = new Conversation();
+        $conversation = new Conversation;
         $conversation->user_id = 1;
         $conversation->save();
 
         $conversationID = json_encode([
             "conversationId" => $conversation->id
         ]);
+
+        return response()->json(["text" => 'oiiii']);
 
         $response = Http::withHeaders([
             "Accept" => "application/json",
@@ -33,22 +39,48 @@ class ChatterBlastController extends Controller
         ]);
     }
 
-    public function continueConversation(Request $request) : JsonResponse {
-        $request->validate([
-            'prompt' => 'required'
-        ]);
+    public function continueConversation(Request $request, $id) {
+        // $content = $request->json('prompt');
+        // print_r($content);
+        // die;
 
-        $prompt = json_encode([
-            "prompt" => $request->prompt
-        ]);
+        $conversation = Conversation::find($id);
 
+        if (!$conversation) {
+            $conversation = new Conversation;
+            $conversation->id = $id;
+            $conversation->user_id = 1;
+            $conversation->save();
+        }
+
+        // $request->validate([
+        //     "prompt" => 'required'
+        // ]);
+
+        // CREATE CONVERSATION
+        $conversationID = json_encode([
+            "conversationId" => $conversation->id
+        ]);
 
         $response = Http::withHeaders([
-            "User-Agent" => "Thunder Client (https://www.thunderclient.com)",
-            "Accept" => "text/plain",
+            "Accept" => "application/json",
+            "Content-Type" => "application/json"
         ])
-        ->withBody($prompt, "text/plain")
-        ->post("127.0.0.1:9001/conversation/$request->conversation_id");
+        ->withBody($conversationID)
+        ->post("127.0.0.1:9001/conversation");
+
+        // CONTINUE CONVERSATION
+
+        $prompt = json_encode([
+            "prompt" => "hi"
+        ]);
+
+        $response = Http::withHeaders([
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json'
+        ])
+        ->withBody($prompt, 'text/plain')
+        ->post("127.0.0.1:9001/conversation/$id");
 
         // sleep(2);
 
@@ -57,8 +89,6 @@ class ChatterBlastController extends Controller
         //     "Accept" => "application/json"
         // ])
         // ->get("127.0.0.1:9001/conversation/$request->conversation_id");
-        return response()->json([
-            "response" => $response
-        ]);
+        return  $response;
     }
 }
