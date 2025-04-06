@@ -23,7 +23,7 @@ export default function ChatScreen() {
   ]);
   const [input, setInput] = useState('');
   const [typingMessage, setTypingMessage] = useState('');
-  const [conversationId] = useState('100');
+  const [conversationId, setConversationId] = useState<number>();
   const typingIndex = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -41,11 +41,11 @@ export default function ChatScreen() {
 
     try {
       console.log('Sending request to API...');
-      
-      const response = await axios.get<ApiResponse>(`http://127.0.0.1:8080/api/chat/conversation/${conversationId}`);
+      const prompt =  { prompt: userMessage.text }
+      const response = await axios.post<ApiResponse>(`http://127.0.0.1:8080/api/chat/conversation/${conversationId}`, prompt);
       console.log('API Response:', response.data);
 
-      const conversationData = response.data[conversationId];
+      const conversationData = response.data[conversationId || 100];
       if (!conversationData) {
         throw new Error('Invalid response format');
       }
@@ -85,6 +85,12 @@ export default function ChatScreen() {
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages, typingMessage]);
+
+  useEffect(() => {
+    const newId = Math.floor(100000 + Math.random() * 900000);
+    setConversationId(newId);
+    console.log('Generated conversationId:', newId);
+  }, []);
 
   return (
     <View style={styles.container}>
