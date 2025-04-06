@@ -33,23 +33,23 @@ export default function App() {
         const statusResponse = await fetch(`http://127.0.0.1:8080/api/status/${job_id}`);
         const statusData = await statusResponse.json();
         
-        setGenerationStatus(prev => ({
-          ...prev,
-          progress: statusData.progress,
-          imageUrl: statusData.image_url
-        }));
-        
         if (statusData.status === 'finished') {
           const resultResponse = await fetch(`http://127.0.0.1:8080/api/result/${job_id}`);
           const resultData = await resultResponse.json();
           
+          setGenerationStatus({
+            status: 'finished',
+            progress: 100,
+            resourceId: resultData.resource_id,
+            imageUrl: resultData.image_url,
+            jobId: job_id
+          });
+        } else {
           setGenerationStatus(prev => ({
             ...prev,
-            status: 'finished',
-            resourceId: resultData.resource_id,
-            imageUrl: resultData.image_url
+            progress: statusData.progress || prev.progress,
+            imageUrl: statusData.image_url || prev.imageUrl
           }));
-        } else {
           setTimeout(checkStatus, 1000);
         }
       };
@@ -62,16 +62,17 @@ export default function App() {
   };
 
   const handleZoom = async (direction: 'in' | 'out') => {
-    if (!generationStatus.resourceId) return;
+    if (!generationStatus.resourceId) {
+      console.log('No resource ID available');
+      return;
+    } 
     
     try {
-      // Keep the current image while loading
       const currentImageUrl = generationStatus.imageUrl;
       
       setGenerationStatus(prev => ({ 
         ...prev, 
         status: 'upscaling',
-        // Keep the current image URL while upscaling
         imageUrl: currentImageUrl 
       }));
       
@@ -80,29 +81,42 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resource_id: generationStatus.resourceId })
       });
-
-      console.log(response);
       
-      const data = await response.json();
+      const { job_id } = await response.json();
       
-      // Only update the image URL if we got a valid response
-      if (data.image_url) {
-        setGenerationStatus(prev => ({
-          ...prev,
-          status: 'finished',
-          resourceId: data.resource_id,
-          imageUrl: data.image_url
-        }));
-      } else {
-        // If no new image URL, revert to previous state
-        setGenerationStatus(prev => ({
-          ...prev,
-          status: 'finished'
-        }));
-      }
+      const checkZoomStatus = async () => {
+        const statusResponse = await fetch(`http://127.0.0.1:8080/api/status/${job_id}`);
+        const statusData = await statusResponse.json();
+        
+        
+        if (statusData.status === 'finished') {
+          console.log(statusData);
+          const resultResponse = await fetch(`http://127.0.0.1:8080/api/result/${job_id}`);
+          const resultData = await resultResponse.json();
+          console.log()
+          console.log(resultData);
+          
+          setGenerationStatus(prev => ({
+            ...prev,
+            status: 'finished',
+            resourceId: resultData.resource_id,
+            imageUrl: statusData.image_url,
+            jobId: job_id
+          }));
+        } else {
+          console.log(statusData);
+          setGenerationStatus(prev => ({
+            ...prev,
+            imageUrl: statusData.image_url,
+            progress: statusData.progress || prev.progress
+          }));
+          setTimeout(checkZoomStatus, 1000);
+        }
+      };
+      
+      checkZoomStatus();
     } catch (error) {
       console.error('Error zooming image:', error);
-      // On error, revert to previous state while keeping the current image
       setGenerationStatus(prev => ({ 
         ...prev, 
         status: 'finished'
@@ -129,10 +143,10 @@ export default function App() {
             
             <TouchableOpacity
               onPress={generateImage}
-              disabled={generationStatus.status !== 'idle' || !prompt.trim()}
+              disabled={generationStatus.status === 'generating' || generationStatus.status === 'upscaling' || !prompt.trim()}
               style={[
                 styles.generateButton,
-                (generationStatus.status !== 'idle' || !prompt.trim()) && styles.generateButtonDisabled
+                (generationStatus.status === 'generating' || generationStatus.status === 'upscaling' || !prompt.trim()) && styles.generateButtonDisabled
               ]}
             >
               {generationStatus.status === 'generating' ? (
@@ -155,13 +169,12 @@ export default function App() {
                   source={{ uri: generationStatus.imageUrl }}
                   style={styles.generatedImage}
                   resizeMode="contain"
-                  // Add onError handler to help with debugging
                   onError={(e) => console.error('Image loading error:', e.nativeEvent.error)}
                 />
                 {generationStatus.status === 'upscaling' && (
                   <View style={styles.upscalingOverlay}>
                     <Loader2 size={40} color="#fff" style={{ transform: [{ rotate: '360deg' }] }} />
-                    <Text style={styles.upscalingText}>Zooming...</Text>
+                    <Text style={styles.upscalingText}>Zooming... {generationStatus.progress}%</Text>
                   </View>
                 )}
               </View>

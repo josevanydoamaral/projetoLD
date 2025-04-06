@@ -108,7 +108,7 @@ class DreamWeaverController extends Controller
 
         $this->response = Http::withHeaders($headers)
         ->withBody($body)                          
-        ->post("http://127.0.0.1:9002/zoom/in");
+        ->post("http://127.0.0.1:9002/zoom/out");
 
         return $this->response;
     }
